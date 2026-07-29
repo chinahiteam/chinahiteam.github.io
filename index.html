@@ -132,6 +132,7 @@ p.lead{margin:0 0 22px;color:#3A2F35;font-size:15px}
 .install b{font-family:var(--display);font-weight:700}
 textarea{width:100%;min-height:190px;padding:13px;border:1.5px solid var(--ink);border-radius:14px;
   background:var(--paper);font-family:ui-monospace,Menlo,monospace;font-size:12px;line-height:1.5;color:var(--ink)}
+.ver{margin-top:14px;text-align:center;font-size:11px;letter-spacing:.04em;color:var(--muted);opacity:.75}
 .spacer{flex:1}
 .foot{margin-top:20px;display:flex;justify-content:center;gap:18px}
 .link{background:none;border:0;font-family:var(--body);font-size:13px;color:var(--muted);
@@ -155,6 +156,8 @@ const CONFIG = {
   minNameLength: 3,
   minOpenLength: 25
 };
+
+const VERSION = "1.0 · 29.07.2026";
 
 const BANK = {
   kitchen: {
@@ -349,7 +352,7 @@ function stopTimer(){ if(S.timer){clearInterval(S.timer);S.timer=null;} }
 /* ---------- відправка менеджеру ---------- */
 function payload(kind,extra){
   return Object.assign({
-    kind, name:S.name||"без імені",
+    kind, version:VERSION, name:S.name.trim()||"без імені",
     date:new Date().toLocaleString("uk-UA"),
     resets:S.resets
   },extra);
@@ -396,7 +399,7 @@ function reportText(){
 
 /* ---------- екрани ---------- */
 function render(){
-  const f={home,quiz,open:openScreen,broken,"test-done":testDone,final,import:importer,manager}[S.screen]||home;
+  const f={home,quiz,open:openScreen,broken,"test-done":testDone,final,manager}[S.screen]||home;
   app.innerHTML=f();
   document.body.classList.toggle("noselect",S.screen==="quiz");
   window.scrollTo(0,0);
@@ -435,8 +438,8 @@ function home(){
   <div class="spacer"></div>
   <div class="foot">
     <button class="link" id="mgr">Для менеджера</button>
-    <button class="link" id="imp">Додати питання</button>
-  </div>`;
+  </div>
+  <div class="ver">версія ${VERSION}</div>`;
 }
 
 function quiz(){
@@ -534,6 +537,7 @@ function manager(){
     <div class="row"><span>Секунд на питання</span><b>${CONFIG.secondsPerQuestion||"без ліміту"}</b></div>
     <div class="row"><span>Обнулення при виході</span><b>${CONFIG.resetOnLeave?"увімкнено":"вимкнено"}</b></div>
     <div class="row"><span>Поріг допуску</span><b>${GATE}%</b></div>
+    <div class="row"><span>Версія додатка</span><b>${VERSION}</b></div>
   </div>
   <h2 style="margin-top:26px">Звіт поточної сесії</h2>
   ${any?`<div class="explain" style="white-space:pre-wrap">${esc(reportText())}</div>
@@ -541,18 +545,6 @@ function manager(){
   :`<p class="lead">Ще нічого не складено в цій сесії.</p>`}
   <div class="note">Пін-код і адресу таблиці змінюють у блоці НАЛАШТУВАННЯ на початку файлу.</div>
   <button class="btn ghost" id="back">Назад</button>`;
-}
-
-function importer(){
-  return head()+`
-  <h1>Додати питання</h1>
-  <p class="lead">Скопіюй рядки з Excel і встав сюди. Колонки через табуляцію:</p>
-  <div class="explain"><b>Формат</b>тест · питання · варіант А · Б · В · Г · номер правильного (1–4) · пояснення<br><br>
-  У колонці «тест» пиши: кухня, бар або сервіс.</div>
-  <textarea id="ta" placeholder="кухня&#9;Скільки грамів у порції рису?&#9;150&#9;200&#9;250&#9;300&#9;2&#9;Стандартна порція — 200 г."></textarea>
-  <button class="btn" id="doimp">Додати до банку</button>
-  <button class="btn ghost" id="back">Назад</button>
-  <div class="note">Питання додаються тільки на цьому пристрої й до перезавантаження. Щоб зафіксувати назавжди — надішли таблицю, і я вшию її у файл.</div>`;
 }
 
 /* ---------- завершення питання ---------- */
@@ -632,7 +624,6 @@ app.addEventListener("click",e=>{
     return}
 
   if(t.id==="mgr"){S.screen="manager";render();return}
-  if(t.id==="imp"){S.screen="import";render();return}
   if(t.id==="dopin"){S.pin=(document.getElementById("pin")||{}).value||"";render();return}
 
   if(t.id==="copy"){
@@ -644,20 +635,6 @@ app.addEventListener("click",e=>{
     }else alert(txt);
     return}
 
-  if(t.id==="doimp"){
-    const map={"кухня":"kitchen","бар":"bar","сервіс":"service"};
-    let n=0;
-    (document.getElementById("ta").value||"").split("\n").forEach(line=>{
-      const c=line.split("\t").map(x=>x.trim());
-      if(c.length<7) return;
-      const k=map[c[0].toLowerCase()]; const ri=parseInt(c[6],10)-1;
-      if(!k||isNaN(ri)||ri<0||ri>3) return;
-      const opts=[c[2],c[3],c[4],c[5]].filter(Boolean);
-      if(opts.length<2||ri>=opts.length) return;
-      BANK[k].q.push([c[1],opts,ri,c[7]||""]);n++;
-    });
-    alert(n?`Додано питань: ${n}`:"Не додано жодного. Перевір табуляцію і номер правильної відповіді (1–4).");
-    S.screen="home";render();return}
 });
 
 app.addEventListener("input",e=>{
