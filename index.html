@@ -153,11 +153,12 @@ const CONFIG = {
   secondsPerQuestion: 60,
   resetOnLeave: true,
   managerPin: "2580",
-  minNameLength: 3,
+  minNameLength: 2,
+  minPhoneDigits: 10,
   minOpenLength: 25
 };
 
-const VERSION = "1.0 · 29.07.2026";
+const VERSION = "1.1 · 01.08.2026";
 
 const BANK = {
   kitchen: {
@@ -280,24 +281,29 @@ const OPEN_Q = {
 };
 
 const TIERS=[
-  {min:97,add:0.6,label:"Бездоганно"},
-  {min:90,add:0.4,label:"Сильний рівень"},
-  {min:80,add:0.2,label:"Норма"},
+  {min:98,add:0.4,label:"Бездоганно"},
+  {min:93,add:0.3,label:"Сильний рівень"},
+  {min:87,add:0.2,label:"Норма"},
   {min:0, add:0,  label:"Не склав"}
 ];
-const BASE=1.8, GATE=80;
+const BASE=1.8, GATE=87;
 const ORDER=["kitchen","bar","service"];
 const KEYS=["А","Б","В","Г","Д"];
 
-let S={name:"",screen:"home",test:null,qs:[],i:0,picked:null,
+let S={firstName:"",lastName:"",phone:"",screen:"home",test:null,qs:[],i:0,picked:null,
        answers:[],results:{},resets:0,startedAt:0,tLeft:0,timer:null,sent:{},pin:""};
+const fullName=()=>`${S.firstName.trim()} ${S.lastName.trim()}`.trim();
 
 const app=document.getElementById("app");
 const pct=(a,b)=>b?Math.round(a/b*1000)/10:0;
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const nf=n=>String(n).replace(".",",");
 const tierOf=p=>TIERS.find(t=>p>=t.min);
-const nameOk=()=>S.name.trim().length>=CONFIG.minNameLength;
+const phoneDigits=s=>(s||"").replace(/\D/g,"");
+const firstNameOk=()=>S.firstName.trim().length>=CONFIG.minNameLength;
+const lastNameOk=()=>S.lastName.trim().length>=CONFIG.minNameLength;
+const phoneOk=()=>phoneDigits(S.phone).length>=CONFIG.minPhoneDigits;
+const regOk=()=>firstNameOk()&&lastNameOk()&&phoneOk();
 
 const face=t=>{const m=["M11 22 Q17 24 23 22","M11 21 Q17 25 23 21","M10 20 Q17 27 24 20","M10 20 Q17 28 24 20"][t];
   const eyes=t===3?'<path d="M10 13 Q12.5 10.5 15 13" fill="none" stroke="#111" stroke-width="1.6" stroke-linecap="round"/><path d="M19 13 Q21.5 10.5 24 13" fill="none" stroke="#111" stroke-width="1.6" stroke-linecap="round"/>':'<circle cx="12.5" cy="13" r="1.7"/><circle cx="21.5" cy="13" r="1.7"/>';
@@ -352,7 +358,7 @@ function stopTimer(){ if(S.timer){clearInterval(S.timer);S.timer=null;} }
 /* ---------- відправка менеджеру ---------- */
 function payload(kind,extra){
   return Object.assign({
-    kind, version:VERSION, name:S.name.trim()||"без імені",
+    kind, version:VERSION, name:fullName()||"без імені", phone:S.phone.trim()||"без телефону",
     date:new Date().toLocaleString("uk-UA"),
     resets:S.resets
   },extra);
@@ -370,7 +376,7 @@ function reportText(){
   const gate=rs.length===3&&rs.every(r=>r.p>=GATE);
   const avg=rs.length===3?Math.round(rs.reduce((s,r)=>s+r.p,0)/3*10)/10:0;
   const t=gate?tierOf(avg):TIERS[3];
-  let out=`CHINA HI — атестація\n${S.name||"без імені"}\n${new Date().toLocaleString("uk-UA")}\n\n`;
+  let out=`CHINA HI — атестація\n${fullName()||"без імені"}\n${S.phone||"без телефону"}\n${new Date().toLocaleString("uk-UA")}\n\n`;
   ORDER.forEach(k=>{const r=S.results[k];
     out+=`${BANK[k].title}: ${r?nf(r.p)+"% ("+r.correct+"/"+r.total+")":"не складено"}\n`});
   if(rs.length===3){
@@ -408,14 +414,22 @@ const head=()=>`<div class="brandbar"><b>hi</b><span>атестація кома
 
 function home(){
   const ready=ORDER.every(k=>S.results[k]);
-  const ok=nameOk();
+  const ok=regOk();
   return head()+`
   <h1>Три тести — і ти знаєш свій відсоток</h1>
   <p class="lead">Кухня, бар, сервіс. У кожному треба щонайменше ${GATE}%. Далі середній бал вирішує надбавку до базових ${nf(BASE)}%.</p>
 
-  <div class="field"><label>Твоє ім'я та прізвище</label>
-    <input id="nm" value="${esc(S.name)}" placeholder="Наприклад: Марія Коваль" autocomplete="off">
-    <span class="hint" id="nmhint" style="${ok?"display:none":""}">Без імені тест не почнеться — менеджер має знати, чий це результат.</span>
+  <div class="field"><label>Ім'я</label>
+    <input id="fn" value="${esc(S.firstName)}" placeholder="Марія" autocomplete="given-name">
+    <span class="hint" id="fnhint" style="${firstNameOk()?"display:none":""}">Без імені тест не почнеться.</span>
+  </div>
+  <div class="field"><label>Прізвище</label>
+    <input id="ln" value="${esc(S.lastName)}" placeholder="Коваль" autocomplete="family-name">
+    <span class="hint" id="lnhint" style="${lastNameOk()?"display:none":""}">Прізвище обов'язкове — менеджер має знати, чий це результат.</span>
+  </div>
+  <div class="field"><label>Номер телефону</label>
+    <input id="ph" value="${esc(S.phone)}" placeholder="+380 XX XXX XX XX" autocomplete="tel" inputmode="tel">
+    <span class="hint" id="phhint" style="${phoneOk()?"display:none":""}">Телефон обов'язковий — для зв'язку у разі спірного результату.</span>
   </div>
 
   <div class="warnbox"><b>Як це працює</b>
@@ -496,7 +510,7 @@ function final(){
   const t=gate?tierOf(avg):TIERS[3];
   return head()+`
   <h1>Підсумок атестації</h1>
-  <p class="lead">${esc(S.name||"Без імені")} · ${new Date().toLocaleDateString("uk-UA")}</p>
+  <p class="lead">${esc(fullName()||"Без імені")} · ${new Date().toLocaleDateString("uk-UA")}</p>
   <div class="rows">
     ${ORDER.map(k=>`<div class="row"><span>${BANK[k].title}</span>
       <b class="${S.results[k].p>=GATE?'pass':'fail'}">${nf(S.results[k].p)}%</b></div>`).join("")}
@@ -513,7 +527,7 @@ function final(){
         <span class="lb">${x.add?`+${nf(x.add)} · від ${x.min}%`:"нижче порога"}</span></div>`}).join("")}
   </div>
   <div class="bignum">${nf(BASE+t.add)}%</div>
-  <p class="lead">${t.label}. Це твій відсоток на наступний квартал.</p>
+  <p class="lead">${t.label}. Це твій індивідуальний бонус за атестацію — додається до бази й командного бонусу.</p>
   <div class="note" id="sendstate">${CONFIG.endpoint
     ? "Результат надіслано менеджеру автоматично."
     : "Надішли результат менеджеру — кнопка нижче копіює звіт у буфер."}</div>
@@ -581,10 +595,20 @@ function finish(openAnswer){
 }
 
 function startTest(key){
-  const nm=document.getElementById("nm"); if(nm) S.name=nm.value;
-  if(!nameOk()){
-    const h=document.getElementById("nmhint"); if(h)h.style.display="block";
-    if(nm)nm.focus();
+  const fn=document.getElementById("fn"); if(fn) S.firstName=fn.value;
+  const ln=document.getElementById("ln"); if(ln) S.lastName=ln.value;
+  const ph=document.getElementById("ph"); if(ph) S.phone=ph.value;
+  if(!regOk()){
+    const bad=[
+      [firstNameOk(),"fnhint","fn"],
+      [lastNameOk(),"lnhint","ln"],
+      [phoneOk(),"phhint","ph"]
+    ];
+    let focused=false;
+    bad.forEach(([isOk,hintId,fieldId])=>{
+      const h=document.getElementById(hintId); if(h)h.style.display=isOk?"none":"block";
+      if(!isOk&&!focused){const f=document.getElementById(fieldId); if(f)f.focus(); focused=true;}
+    });
     return;
   }
   S.test=key;S.qs=draw();S.i=0;S.picked=null;S.answers=[];
@@ -638,11 +662,15 @@ app.addEventListener("click",e=>{
 });
 
 app.addEventListener("input",e=>{
-  if(e.target.id==="nm"){
-    S.name=e.target.value;
-    const ok=nameOk();
+  if(e.target.id==="fn"||e.target.id==="ln"||e.target.id==="ph"){
+    if(e.target.id==="fn")S.firstName=e.target.value;
+    if(e.target.id==="ln")S.lastName=e.target.value;
+    if(e.target.id==="ph")S.phone=e.target.value;
+    const ok=regOk();
     document.querySelectorAll("[data-test]").forEach(b=>b.disabled=!ok);
-    const h=document.getElementById("nmhint"); if(h) h.style.display=ok?"none":"block";
+    const fh=document.getElementById("fnhint"); if(fh) fh.style.display=firstNameOk()?"none":"block";
+    const lh=document.getElementById("lnhint"); if(lh) lh.style.display=lastNameOk()?"none":"block";
+    const ph=document.getElementById("phhint"); if(ph) ph.style.display=phoneOk()?"none":"block";
   }
   if(e.target.id==="oa"){
     const h=document.getElementById("oahint");
