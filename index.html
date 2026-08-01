@@ -158,7 +158,7 @@ const CONFIG = {
   minOpenLength: 25
 };
 
-const VERSION = "1.1 · 01.08.2026";
+const VERSION = "1.2 · 01.08.2026";
 
 const BANK = {
   kitchen: {
@@ -290,7 +290,7 @@ const BASE=1.8, GATE=87;
 const ORDER=["kitchen","bar","service"];
 const KEYS=["А","Б","В","Г","Д"];
 
-let S={firstName:"",lastName:"",phone:"",screen:"home",test:null,qs:[],i:0,picked:null,
+let S={firstName:"",lastName:"",phone:"",screen:"register",test:null,qs:[],i:0,picked:null,
        answers:[],results:{},resets:0,startedAt:0,tLeft:0,timer:null,sent:{},pin:""};
 const fullName=()=>`${S.firstName.trim()} ${S.lastName.trim()}`.trim();
 
@@ -405,19 +405,17 @@ function reportText(){
 
 /* ---------- екрани ---------- */
 function render(){
-  const f={home,quiz,open:openScreen,broken,"test-done":testDone,final,manager}[S.screen]||home;
+  const f={register,home,quiz,open:openScreen,broken,"test-done":testDone,final,manager}[S.screen]||register;
   app.innerHTML=f();
   document.body.classList.toggle("noselect",S.screen==="quiz");
   window.scrollTo(0,0);
 }
 const head=()=>`<div class="brandbar"><b>hi</b><span>атестація команди</span></div>`;
 
-function home(){
-  const ready=ORDER.every(k=>S.results[k]);
-  const ok=regOk();
+function register(){
   return head()+`
-  <h1>Три тести — і ти знаєш свій відсоток</h1>
-  <p class="lead">Кухня, бар, сервіс. У кожному треба щонайменше ${GATE}%. Далі середній бал вирішує надбавку до базових ${nf(BASE)}%.</p>
+  <h1>Реєстрація</h1>
+  <p class="lead">Заповни дані — далі перейдеш до трьох тестів: кухня, бар, сервіс.</p>
 
   <div class="field"><label>Ім'я</label>
     <input id="fn" value="${esc(S.firstName)}" placeholder="Марія" autocomplete="given-name">
@@ -432,6 +430,17 @@ function home(){
     <span class="hint" id="phhint" style="${phoneOk()?"display:none":""}">Телефон обов'язковий — для зв'язку у разі спірного результату.</span>
   </div>
 
+  <button class="btn" id="reg-go">Продовжити</button>`;
+}
+
+function home(){
+  const ready=ORDER.every(k=>S.results[k]);
+  if(!regOk()){S.screen="register";return register();}
+  return head()+`
+  <h1>Три тести — і ти знаєш свій відсоток</h1>
+  <p class="lead">${esc(fullName())} · <button class="link" id="reg-edit" style="display:inline">змінити дані</button></p>
+  <p class="lead">Кухня, бар, сервіс. У кожному треба щонайменше ${GATE}%. Далі середній бал вирішує надбавку до базових ${nf(BASE)}%.</p>
+
   <div class="warnbox"><b>Як це працює</b>
     ${CONFIG.secondsPerQuestion} секунд на питання. Останнє питання в кожному тесті — відкрите, там час не обмежено.
     Не згортай додаток і не перемикайся на інші застосунки — спроба почнеться заново з новими питаннями.
@@ -440,7 +449,7 @@ function home(){
   ${ORDER.map((k,n)=>{
     const b=BANK[k], r=S.results[k];
     const sc=r?`<span class="score ${r.p>=GATE?'pass':'fail'}">${nf(r.p)}%</span>`:"";
-    return `<button class="tcard" data-test="${k}" ${ok?"":"disabled"}>
+    return `<button class="tcard" data-test="${k}">
       <span class="num">${n+1}</span>
       <span class="body"><strong>${b.title}</strong><em>${Math.min(b.show,b.q.length)} + 1 відкрите${r?` · ${r.p>=GATE?'зараховано':'нижче порога'}`:""}</em></span>
       ${sc}</button>`}).join("")}
@@ -595,22 +604,7 @@ function finish(openAnswer){
 }
 
 function startTest(key){
-  const fn=document.getElementById("fn"); if(fn) S.firstName=fn.value;
-  const ln=document.getElementById("ln"); if(ln) S.lastName=ln.value;
-  const ph=document.getElementById("ph"); if(ph) S.phone=ph.value;
-  if(!regOk()){
-    const bad=[
-      [firstNameOk(),"fnhint","fn"],
-      [lastNameOk(),"lnhint","ln"],
-      [phoneOk(),"phhint","ph"]
-    ];
-    let focused=false;
-    bad.forEach(([isOk,hintId,fieldId])=>{
-      const h=document.getElementById(hintId); if(h)h.style.display=isOk?"none":"block";
-      if(!isOk&&!focused){const f=document.getElementById(fieldId); if(f)f.focus(); focused=true;}
-    });
-    return;
-  }
+  if(!regOk()){S.screen="register";render();return;}
   S.test=key;S.qs=draw();S.i=0;S.picked=null;S.answers=[];
   S.startedAt=Date.now();S.screen="quiz";
   render();guardOn();startTimer();
@@ -624,6 +618,26 @@ app.addEventListener("click",e=>{
   if(t.dataset.opt!==undefined){S.picked=+t.dataset.opt;render();return}
   if(t.id==="nx"){commit(false);return}
   if(t.id==="again"){startTest(S.test);return}
+
+  if(t.id==="reg-go"){
+    const fn=document.getElementById("fn"); if(fn) S.firstName=fn.value;
+    const ln=document.getElementById("ln"); if(ln) S.lastName=ln.value;
+    const ph=document.getElementById("ph"); if(ph) S.phone=ph.value;
+    if(!regOk()){
+      const bad=[
+        [firstNameOk(),"fnhint","fn"],
+        [lastNameOk(),"lnhint","ln"],
+        [phoneOk(),"phhint","ph"]
+      ];
+      let focused=false;
+      bad.forEach(([isOk,hintId,fieldId])=>{
+        const h=document.getElementById(hintId); if(h)h.style.display=isOk?"none":"block";
+        if(!isOk&&!focused){const f=document.getElementById(fieldId); if(f)f.focus(); focused=true;}
+      });
+      return;
+    }
+    S.screen="home";render();return}
+  if(t.id==="reg-edit"){S.screen="register";render();return}
 
   if(t.id==="doneopen"){
     const ta=document.getElementById("oa");
@@ -679,6 +693,35 @@ app.addEventListener("input",e=>{
 });
 document.addEventListener("contextmenu",e=>{if(S.screen==="quiz")e.preventDefault()});
 render();
+
+/* ---------- перевірка оновлень ----------
+   На телефоні (особливо в режимі «На екран Додому») сторінка кешується
+   і не оновлюється сама. Тому робимо явний запит в обхід кешу й порівнюємо
+   версію в щойно завантаженому HTML з версією поточної сесії. */
+function checkForUpdate(){
+  fetch(location.pathname,{cache:"no-store"})
+    .then(r=>r.text())
+    .then(html=>{
+      const m=html.match(/const VERSION\s*=\s*"([^"]+)"/);
+      if(m && m[1]!==VERSION) showUpdateBanner();
+    })
+    .catch(()=>{});
+}
+function showUpdateBanner(){
+  if(document.getElementById("updbar")) return;
+  const bar=document.createElement("div");
+  bar.id="updbar";
+  bar.innerHTML=`<span>Доступна нова версія застосунку</span><button id="updbtn" style="background:var(--pink);color:var(--ink);border:0;border-radius:10px;padding:8px 14px;font-family:var(--body);font-weight:700;font-size:13px;white-space:nowrap">Оновити</button>`;
+  bar.style.cssText="position:fixed;top:0;left:0;right:0;z-index:999;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;background:var(--ink);color:var(--pink);font-family:var(--body);font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,.2)";
+  document.body.prepend(bar);
+  document.getElementById("updbtn").addEventListener("click",()=>{
+    location.href=location.pathname+"?v="+Date.now();
+  });
+}
+setTimeout(checkForUpdate,1200);
+document.addEventListener("visibilitychange",()=>{
+  if(document.visibilityState==="visible") checkForUpdate();
+});
 
 </script>
 </body>
